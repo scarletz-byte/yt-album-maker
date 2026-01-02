@@ -113,4 +113,4 @@ if st.button("🚀 GENERATE MASTERPIECE VIDEO"):
             
         except Exception as e:
             st.error(f"Kesalahan: {e}")
-                                   
+    
