@@ -1,23 +1,24 @@
 import streamlit as st
 import os, librosa, numpy as np
+# Import MoviePy v2.x tanpa .editor
 from moviepy import ImageClip, AudioFileClip, VideoClip, CompositeVideoClip
 from natsort import natsorted
 from pydub import AudioSegment
 from PIL import Image, ImageDraw, ImageFont
 
-# FIX 2026: Atasi penghapusan PIL.Image.ANTIALIAS
+# FIX 2026: Tambalan untuk Pillow 10+ yang menghapus ANTIALIAS
 import PIL.Image
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
 
-st.set_page_config(page_title="Studio Album 2026", layout="wide")
+st.set_page_config(page_title="Studio Album Studio 2026", layout="wide")
 
-# FUNGSI RENDER TEKS (Kompatibel MoviePy v2.x & Tanpa ImageMagick)
+# FUNGSI RENDER TEKS (Kompatibel MoviePy 2026 & Bebas ImageMagick)
 def create_text_image(text, fontsize, color=(255, 255, 255), size=(1920, 1080), pos=(0,0), duration=1):
     img = Image.new('RGBA', size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     try:
-        # Font standar Linux Streamlit Cloud
+        # Lokasi font standar di server Linux Streamlit Cloud
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fontsize)
     except:
         font = ImageFont.load_default()
@@ -25,6 +26,7 @@ def create_text_image(text, fontsize, color=(255, 255, 255), size=(1920, 1080), 
     draw.text(pos, text, fill=color, font=font)
     img_array = np.array(img)
     
+    # Inisialisasi Clip dengan durasi eksplisit
     clip = ImageClip(img_array)
     clip.duration = duration
     return clip
@@ -41,7 +43,7 @@ with col1:
 
 with col2:
     st.subheader("🎶 Audio Tracks")
-    audio_files = st.file_uploader("Upload MP3 (Multiple)", type=["mp3"], accept_multiple_files=True)
+    audio_files = st.file_uploader("Upload MP3 (Pilih Banyak)", type=["mp3"], accept_multiple_files=True)
 
 if st.button("🚀 GENERATE MASTERPIECE VIDEO"):
     if not bg_file or not audio_files:
@@ -83,7 +85,7 @@ if st.button("🚀 GENERATE MASTERPIECE VIDEO"):
                 st.write("🎬 Merakit Video...")
                 with open("bg.png", "wb") as f: f.write(bg_file.getbuffer())
                 
-                # Pre-processing Background dengan Pillow agar bebas error 'function'
+                # Pre-processing Background dengan Pillow agar stabil
                 orig_bg = Image.open("bg.png").convert("RGB").resize((1920, 1080))
                 dark_bg = np.array(orig_bg)
                 dark_bg = (dark_bg * 0.3).astype('uint8')
@@ -99,9 +101,12 @@ if st.button("🚀 GENERATE MASTERPIECE VIDEO"):
                 for i, tr in enumerate(track_meta):
                     y_p = 240 + ((i % 10) * 60)
                     x_p = 200 if i < 10 else 1100
+                    
                     t_off = create_text_image(f"{i+1}. {tr['name']}", 25, color=(120, 120, 120), pos=(x_p, y_p), duration=duration)
+                    
                     t_on = create_text_image(f"{i+1}. {tr['name']}", 25, color=(251, 191, 36), pos=(x_p, y_p), duration=tr['end']-tr['start'])
                     t_on = t_on.with_start(tr['start'])
+                    
                     overlays.extend([t_off, t_on])
 
                 # Visualizer Bar
@@ -110,19 +115,27 @@ if st.button("🚀 GENERATE MASTERPIECE VIDEO"):
                     frame = np.zeros((220, 1920, 4), dtype=np.uint8)
                     for b in range(50):
                         bh = int(pow(audio_features[idx][b], 0.7) * 200)
+                        # Warna Emas (R,G,B,A)
                         frame[220-bh:220, 350+(b*25):350+(b*25)+18] = [251, 191, 36, 255]
                     return frame
 
-                # Fix: Gunakan argumen pertama untuk make_frame
                 spec_clip = VideoClip(make_spec, duration=duration).with_position((0, 830))
                 overlays.append(spec_clip)
 
-                # Export (MoviePy v2.x with_audio syntax)
-                final = CompositeVideoClip(overlays, size=(1920,1080)).with_audio(AudioFileClip("master.mp3"))
-                final.write_videofile("hasil.mp4", fps=fps, codec="libx264", audio_codec="aac")
+                # FINAL COMPOSITE (Wajib Durasi Eksplisit di v2.x)
+                final = CompositeVideoClip(overlays, size=(1920, 1080))
+                final.duration = duration
+                
+                # Gabungkan Audio
+                audio_clip = AudioFileClip("master.mp3")
+                final = final.with_audio(audio_clip)
+
+                # Export Video
+                final.write_videofile("hasil.mp4", fps=fps, codec="libx264", audio_codec="aac", threads=4)
 
             st.success("✅ Video Berhasil Dibuat!")
-            st.download_button("📥 Download MP4", open("hasil.mp4", "rb"), "Album_2026.mp4")
+            with open("hasil.mp4", "rb") as v_file:
+                st.download_button("📥 Download MP4", v_file, "Album_2026.mp4")
             
         except Exception as e:
             st.error(f"❌ Terjadi kesalahan: {str(e)}")
