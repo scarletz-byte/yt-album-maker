@@ -1,3 +1,7 @@
+import PIL.Image
+if not hasattr(PIL.Image, 'ANTIALIAS'):
+    PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
+
 import streamlit as st
 import os, librosa, numpy as np
 from moviepy.editor import *
