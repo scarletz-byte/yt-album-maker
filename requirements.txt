@@ -4,4 +4,4 @@ pydub
 librosa
 natsort
 numpy
-Pillow>=10.0.0
+Pillow
