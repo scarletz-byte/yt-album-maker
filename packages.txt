@@ -1,0 +1,3 @@
+ffmpeg
+imagemagick
+libmagick++-dev
