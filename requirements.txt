@@ -1,7 +1,7 @@
 streamlit
-moviepy
+moviepy>=2.1.0
 pydub
 librosa
 natsort
 numpy
-Pillow
+Pillow>=10.0.0
