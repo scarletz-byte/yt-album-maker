@@ -5,19 +5,19 @@ from natsort import natsorted
 from pydub import AudioSegment
 from PIL import Image, ImageDraw, ImageFont
 
-# PATCH: Atasi error ANTIALIAS di Pillow 10+
+# FIX: Atasi error Pillow 10+
 import PIL.Image
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.Resampling.LANCZOS
 
 st.set_page_config(page_title="Studio Album 2026", layout="wide")
 
-# FUNGSI PENGGANTI TEXTCLIP (Tanpa ImageMagick)
-def create_text_clip_safe(text, fontsize, color=(255, 255, 255), size=(1920, 1080), pos=(0,0), duration=1):
+# FUNGSI PENGGANTI TEXTCLIP (Sangat Aman & Tanpa ImageMagick)
+def create_text_image(text, fontsize, color=(255, 255, 255), size=(1920, 1080), pos=(0,0), duration=1):
     img = Image.new('RGBA', size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
     try:
-        # Gunakan font standar di server Linux Streamlit Cloud
+        # Lokasi font standar di server Linux Streamlit
         font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", fontsize)
     except:
         font = ImageFont.load_default()
@@ -28,20 +28,19 @@ def create_text_clip_safe(text, fontsize, color=(255, 255, 255), size=(1920, 108
 
 st.title("🎵 YOUTUBE ALBUM STUDIO 2026")
 
-# Input Section
 col1, col2 = st.columns([1, 1.5])
 with col1:
     bg_file = st.file_uploader("Upload Cover", type=["jpg", "png", "webp"])
     album_name = st.text_input("Nama Album", "GOLDEN HITS 2026")
 with col2:
-    audio_files = st.file_uploader("Upload MP3 (Pilih Banyak)", type=["mp3"], accept_multiple_files=True)
+    audio_files = st.file_uploader("Upload MP3", type=["mp3"], accept_multiple_files=True)
 
-if st.button("🚀 GENERATE MASTERPIECE VIDEO"):
+if st.button("🚀 GENERATE VIDEO"):
     if not bg_file or not audio_files:
-        st.error("⚠️ Unggah Cover dan MP3!")
+        st.error("⚠️ Upload file dulu!")
     else:
         try:
-            with st.status("🏗️ Memproses Video (Bisa Memakan Waktu)...", expanded=True):
+            with st.status("🏗️ Memproses...", expanded=True):
                 # 1. Gabung Audio
                 sorted_files = natsorted(audio_files, key=lambda x: x.name)
                 full_audio = AudioSegment.empty()
@@ -61,8 +60,7 @@ if st.button("🚀 GENERATE MASTERPIECE VIDEO"):
                     os.remove(temp_p)
 
                 full_audio.export("master.mp3", format="mp3")
-                duration = full_audio.duration_seconds
-
+                
                 # 2. Analisis Spektrum
                 y, sr = librosa.load("master.mp3", sr=22050)
                 fps = 15
@@ -72,21 +70,21 @@ if st.button("🚀 GENERATE MASTERPIECE VIDEO"):
                 audio_features = np.array([np.mean(c, axis=0) for c in np.array_split(spec, 50)]).T
 
                 # 3. Rakit Video
+                duration = full_audio.duration_seconds
                 with open("bg.png", "wb") as f: f.write(bg_file.getbuffer())
-                bg_clip = ImageClip("bg.png").set_duration(duration).resize((1920, 1080)).fl_image(lambda p: (p*0.3).astype('uint8'))
                 
-                # Render Judul & Tracklist (Menggunakan fungsi safe_text_clip)
-                title_clip = create_text_clip_safe(album_name, 70, pos=(750, 70), duration=duration)
+                bg_clip = ImageClip("bg.png").set_duration(duration).resize((1920, 1080)).fl_image(lambda p: (p*0.3).astype('uint8'))
+                title_clip = create_text_image(album_name, 70, pos=(750, 70), duration=duration)
+                
                 overlays = [bg_clip, title_clip]
 
                 for i, tr in enumerate(track_meta):
-                    y_pos = 240 + ((i % 10) * 60)
-                    x_pos = 200 if i < 10 else 1100
-                    t_off = create_text_clip_safe(f"{i+1}. {tr['name']}", 25, color=(120, 120, 120), pos=(x_pos, y_pos), duration=duration)
-                    t_on = create_text_clip_safe(f"{i+1}. {tr['name']}", 25, color=(251, 191, 36), pos=(x_pos, y_pos), duration=tr['end']-tr['start']).set_start(tr['start'])
+                    y_p = 240 + ((i % 10) * 60)
+                    x_p = 200 if i < 10 else 1100
+                    t_off = create_text_image(f"{i+1}. {tr['name']}", 25, color=(150, 150, 150), pos=(x_p, y_p), duration=duration)
+                    t_on = create_text_image(f"{i+1}. {tr['name']}", 25, color=(251, 191, 36), pos=(x_p, y_p), duration=tr['end']-tr['start']).set_start(tr['start'])
                     overlays.extend([t_off, t_on])
 
-                # Visualizer Bar
                 def make_spec(t):
                     idx = min(int(t*fps), len(audio_features)-1)
                     frame = np.zeros((220, 1920, 4), dtype=np.uint8)
@@ -98,13 +96,11 @@ if st.button("🚀 GENERATE MASTERPIECE VIDEO"):
                 spec_clip = VideoClip(make_spec, duration=duration).set_position((0, 830))
                 overlays.append(spec_clip)
 
-                # Export Video
                 final = CompositeVideoClip(overlays, size=(1920,1080)).set_audio(AudioFileClip("master.mp3"))
-                final.write_videofile("hasil.mp4", fps=fps, codec="libx264", audio_codec="aac", threads=4)
+                final.write_videofile("hasil.mp4", fps=fps, codec="libx264", audio_codec="aac")
 
-            st.success("✅ Selesai!")
+            st.success("✅ Berhasil!")
             st.download_button("📥 Download MP4", open("hasil.mp4", "rb"), "Album_2026.mp4")
-            
         except Exception as e:
-            st.error(f"Kesalahan: {e}")
+            st.error(f"Error: {e}")
 
